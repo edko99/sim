@@ -1,7 +1,9 @@
-export function queueLengthEvolution(resourceIndex: number): object {
+import { Resource } from "./sim.ts";
+
+export function queueLengthEvolution(resource: Resource): object {
     return {
         "transform": [
-            {"filter": `datum.rid == ${resourceIndex}`},
+            {"filter": `datum.rid == ${resource.index}`},
             {"fold": ["rT", "xqT"]},
             {"filter": "isValid(datum.value)"},
             {"calculate": "datum.key=='rT' ? 1 : -1", "as": "q"},
@@ -29,10 +31,10 @@ export function queueLengthEvolution(resourceIndex: number): object {
     };
 }
 
-export function queueLengthDistribution(resourceIndex: number, simLength: number): object {
+export function queueLengthDistribution(resource: Resource, simLength: number): object {
     return {
         "transform": [
-            {"filter": `datum.rid == ${resourceIndex}`},
+            {"filter": `datum.rid == ${resource.index}`},
             {"fold": ["rT", "xqT"]},
             {"filter": "isValid(datum.value)"},
             {"calculate": "datum.key=='rT' ? 1 : -1", "as": "q"},
@@ -63,10 +65,10 @@ export function queueLengthDistribution(resourceIndex: number, simLength: number
     }
 }
 
-export function comsumptionEvolution(resourceIndex:number, maxCapacity:number): object {
+export function comsumptionEvolution(resource: Resource, maxCapacity:number): object {
     return {
         "transform": [
-            {"filter": `datum.rid == ${resourceIndex}`},
+            {"filter": `datum.rid == ${resource.index}`},
             {"fold": ["xqT", "lT"]},
             {"filter": "isValid(datum.value)"},
             {"calculate": "datum.key=='xqT' ? datum.cap : -datum.fr", "as": "c"},
@@ -96,10 +98,10 @@ export function comsumptionEvolution(resourceIndex:number, maxCapacity:number): 
     }
 }
 
-export function consumptionDistribution(resourceIndex: number, simLength: number): object {
+export function consumptionDistribution(resource: Resource, simLength: number): object {
     return {
         "transform": [
-            {"filter": `datum.rid == ${resourceIndex}`},
+            {"filter": `datum.rid == ${resource.index}`},
             {"fold": ["xqT", "lT"]},
             {"filter": "isValid(datum.value)"},
             {"calculate": "datum.key=='xqT' ? datum.cap : -datum.fr", "as": "c"},
