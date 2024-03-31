@@ -2,6 +2,10 @@ import { Resource } from "./sim.ts";
 
 export function queueLengthEvolution(resource: Resource): object {
     return {
+        "title": {
+            "text": resource.name,
+            "subtitle": "Queue length over time"
+        },
         "transform": [
             {"filter": `datum.rid == ${resource.index}`},
             {"fold": ["rT", "xqT"]},
@@ -33,6 +37,10 @@ export function queueLengthEvolution(resource: Resource): object {
 
 export function queueLengthDistribution(resource: Resource, simLength: number): object {
     return {
+        "title": {
+            "text": resource.name,
+            "subtitle": "Queue length distribution"
+        },
         "transform": [
             {"filter": `datum.rid == ${resource.index}`},
             {"fold": ["rT", "xqT"]},
@@ -67,6 +75,10 @@ export function queueLengthDistribution(resource: Resource, simLength: number): 
 
 export function comsumptionEvolution(resource: Resource, maxCapacity:number): object {
     return {
+        "title": {
+            "text": resource.name,
+            "subtitle": "Resource usage over time"
+        },
         "transform": [
             {"filter": `datum.rid == ${resource.index}`},
             {"fold": ["xqT", "lT"]},
@@ -100,6 +112,10 @@ export function comsumptionEvolution(resource: Resource, maxCapacity:number): ob
 
 export function consumptionDistribution(resource: Resource, simLength: number): object {
     return {
+        "title": {
+            "text": resource.name,
+            "subtitle": "Resource usage distribution"
+        },
         "transform": [
             {"filter": `datum.rid == ${resource.index}`},
             {"fold": ["xqT", "lT"]},
