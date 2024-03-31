@@ -182,6 +182,10 @@ export class Resource {
         return this.#resource.index;
     }
 
+    get name(): string {
+        return this.#resource.name;
+    }
+
     get log(): ResourceUsageLog[] {
         return this.#resource.log;
     }
