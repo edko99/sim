@@ -1,0 +1,19 @@
+{
+  "version": "3",
+  "packages": {
+    "specifiers": {
+      "jsr:@std/data-structures@^0.221.0": "jsr:@std/data-structures@0.221.0"
+    },
+    "jsr": {
+      "@std/data-structures@0.221.0": {
+        "integrity": "46b16fd296a75cabc0c85c9063795145f8fdf669ec882a52dc1367201172a044"
+      }
+    }
+  },
+  "remote": {},
+  "workspace": {
+    "dependencies": [
+      "jsr:@std/data-structures@^0.221.0"
+    ]
+  }
+}
