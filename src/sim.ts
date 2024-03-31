@@ -345,7 +345,7 @@ export function uniformInt(from:number, until:number, random: () => number = Mat
     return Math.floor((1 + until - from) * random() + from);
 }
 
-export function customDistribution<T>(...point:[weight:number, value:T][]): (random0to1:number|undefined) => T {
+export function customDistribution<T>(...point:[weight:number, value:T][]): (random0to1?: number) => T {
     const total = point.reduce((acc, val) => acc + val[0], 0);
     const normalized:[number, T][] = point.map(([w, v]) => [w/total, v]);
     return (random0to1:number|undefined): T => {
