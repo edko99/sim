@@ -147,3 +147,56 @@ export function consumptionDistribution(resource: Resource, simLength: number): 
         }
     }
 }
+
+export function cmpDistChart(title:string, titles:string[], samples:number[][], stacked:boolean = true): object {
+    const data = samples.flatMap((ss, i) => ss.map(s => ({s, "scenario":titles[i]})));
+    const values = data.map(x => x.s);
+    const min = Math.min(...values);
+    const margin = Math.abs(0.01 * min);
+    const extent = [min - margin, Math.max(...values) + margin];
+    // deno-lint-ignore no-explicit-any
+    const chart: Record<string, any> = {
+        "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+        "width": 400,
+        "height": 100,
+        "data": {"values": data},
+        "title": {"text": `Distribution of ${title}`},
+        "mark": "area",
+        "transform": [{
+            "density": "s",
+            "groupby": ["scenario"],
+            "extent": extent
+        }],
+        "encoding": {
+            "x": {"field":"value", "type":"quantitative", "title":title},
+            "y": {"field":"density", "type":"quantitative", "stack":"zero"}
+        }
+    }
+    if(stacked){
+        chart.encoding.color = {"field":"scenario", "type":"nominal"}
+    }
+    else {
+        chart.encoding.row = {"field":"scenario"}
+    }
+    return chart;
+}
+
+export function chart(data:object, ...charts:object[]): object {
+    return {
+        "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+        "data": {"values": data},
+        "vconcat": charts
+    }
+}
+
+export function vconcat(...charts:object[]): object {
+    return {
+        "vconcat": charts
+    }
+}
+
+export function hconcat(...charts:object[]): object {
+    return {
+        "hconcat": charts
+    }
+}
