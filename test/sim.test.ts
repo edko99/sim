@@ -1,7 +1,8 @@
 import { assertEquals, fail } from "https://deno.land/std@0.219.0/assert/mod.ts";
-import { Process, Sim } from "../src/sim.ts";
-import { Result } from "../src/sim.ts";
-import { PREEMPT } from "../src/sim.ts";
+import { Process, Sim } from "../mod.ts";
+import { Result } from "../mod.ts";
+import { PREEMPT } from "../mod.ts";
+import { Throttle } from "../mod.ts";
 
 Deno.test("One process is scheduled correctly", () => {
     const sim = new Sim();
@@ -149,4 +150,17 @@ Deno.test("Impatience causes non-strict resource queue to advance", () => {
     sim.spawn(small);
     sim.run();
     assertEquals(count, 3);
+});
+
+Deno.test("Throttling", () => {
+    const throttle = new Throttle(4, 2);
+    const sim = new Sim();
+    const exitTime: number[] = [];
+    function* agent(_:number): Process {
+        yield throttle;
+        exitTime.push(sim.time);
+    }
+    for(let i=0; i<10; ++i) sim.spawn(agent);
+    sim.run();
+    assertEquals(exitTime, [0, 0, 0, 0, 2, 2, 2, 2, 4, 4]);
 });

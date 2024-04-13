@@ -10,6 +10,7 @@ export {
     PREEMPT,
     Sim,
     Resource,
+    Throttle,
     customDistribution,
     randomInt,
     uniformInt,

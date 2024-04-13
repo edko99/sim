@@ -1,12 +1,13 @@
 import {BinaryHeap, ascend} from "@std/data-structures";
 import Denque from "npm:denque@2.1.0";
 
-export type Action = number | Request | Release | Preempt;
+export type Action = number | Request | Release | Preempt | Throttle;
 
 export enum Result {
     OK,
     ExceedsCapacity,
     Preempted,
+    Throttled,
 }
 
 export type Process = Generator<Action, void, Result>;
@@ -89,17 +90,21 @@ class SimCore {
     run(totalTime: number|undefined = undefined){
         let event = this.timeline.pop();
         while(event){
-            const [clock, process, result] = event;
-            if(totalTime !== undefined &&  clock >= totalTime){
+            const [time, process, result] = event;
+            if(totalTime !== undefined &&  time >= totalTime){
                 this.time = totalTime;
                 break;
             }
-            this.time = clock;
+            this.time = time;
             const next = process.next(result);
             if(!next.done){
                 const cmd = next.value;
                 if(typeof(cmd) === "number"){
                     this.#schedule(cmd, process, Result.OK);
+                }
+                else if(cmd instanceof Throttle){
+                    const wait = cmd.throttle(time);
+                    this.#schedule(wait, process, wait == 0 ? Result.OK : Result.Throttled);
                 }
                 else if(cmd.kind == "request"){
                     if(process.impatience !== undefined) throw "Impatience processes cannot request resources";
@@ -329,6 +334,27 @@ class ResourceCore {
                 start = mid + 1;
             }
         }
+    }
+}
+
+export class Throttle {
+    #control: Uint32Array;
+    #gap: number;
+    #index = 0;
+    #isFull = false;
+
+    constructor(processCount: number, perTime: number) {
+        this.#control = new Uint32Array(processCount);
+        this.#gap = perTime;
+    }
+
+    throttle(currentTime: number): number {
+        const slot = this.#index;
+        this.#index = (slot + 1) % this.#control.length;
+        const nextActivation = Math.max(currentTime, this.#isFull ? this.#control[slot] + this.#gap : 0);
+        this.#control[slot] = nextActivation;
+        if(this.#index == 0) this.#isFull = true;
+        return nextActivation - currentTime;
     }
 }
 
