@@ -14,7 +14,7 @@ export type Process = Generator<Action, void, Result>;
 export type ProcessGenerator = (id:number) => Process;
 
 type Impatience = {ticket: number, resourceId: number}
-type IdentifiableProcess = Process & {readonly id: number, readonly impatience?: Impatience};
+type ManagedProcess = Process & {readonly id: number, readonly impatience?: Impatience};
 
 type Request = {kind:"request", resource:Resource, capacity:number, impatience:ProcessGenerator|undefined}
 type Release = {kind:"release", resource:Resource, capacity:number}
@@ -31,6 +31,10 @@ export class Sim {
 
     generate(process:ProcessGenerator, mean:number, plusOrMinus:number = 0, delay:number = 0) {
         return this.#sim.generate(process, mean, plusOrMinus, delay);
+    }
+
+    generatePoisson(process:ProcessGenerator, lambda:number = 1, delay:number = 0) {
+        return this.#sim.generatePoisson(process, lambda, delay);
     }
 
     resource(name:string, capacity = 1, strict = true): Resource {
@@ -63,7 +67,7 @@ class SimCore {
     #resourceIndex = 0;
 
     time = 0;
-    timeline = new BinaryHeap<[number, IdentifiableProcess, Result]>(([a,_a],[b,_b]) => ascend(a,b));
+    timeline = new BinaryHeap<[number, ManagedProcess, Result]>(([a,_a],[b,_b]) => ascend(a,b));
     resources: ResourceCore[] = [];
     #resourceMap = new Map<string, ResourceCore>();
 
@@ -75,6 +79,13 @@ class SimCore {
 
     generate(process:ProcessGenerator, mean:number, plusOrMinus:number = 0, delay:number = 0) {
         const generator = generate(this, process, mean, plusOrMinus, delay);
+        const id = ++this.#processId;
+        const idProcess = Object.assign(generator, {id});
+        this.#schedule(0, idProcess, Result.OK);
+    }
+
+    generatePoisson(process:ProcessGenerator, lambda:number = 1, delay:number = 0) {
+        const generator = generatePoisson(this, process, lambda, delay);
         const id = ++this.#processId;
         const idProcess = Object.assign(generator, {id});
         this.#schedule(0, idProcess, Result.OK);
@@ -114,7 +125,7 @@ class SimCore {
                         if(cmd.impatience !== undefined) {
                             const id = ++this.#processId;
                             const impatience:Impatience = {ticket:result.ticket, resourceId:resource.index};
-                            const impatienceProcess: IdentifiableProcess = Object.assign(cmd.impatience(id), {id, impatience});
+                            const impatienceProcess: ManagedProcess = Object.assign(cmd.impatience(id), {id, impatience});
                             this.#schedule(0, impatienceProcess, Result.OK);
                         }
                     }
@@ -171,7 +182,7 @@ class SimCore {
         return this.resources.flatMap(r => r.log);
     }
 
-    #schedule(timeFromNow: number, process: IdentifiableProcess, result: Result) {
+    #schedule(timeFromNow: number, process: ManagedProcess, result: Result) {
         this.timeline.push([this.time + timeFromNow, process, result]);
     }
 }
@@ -230,7 +241,7 @@ class ResourceCore {
     
     #availableCapacity: number;
     #ticketNumber = 0;
-    #q = new Denque<[number, IdentifiableProcess]>();
+    #q = new Denque<[number, ManagedProcess]>();
     #activeProcesses = new Map<number, ResourceUsageLog>();
     readonly log: ResourceUsageLog[] = [];
   
@@ -243,7 +254,7 @@ class ResourceCore {
         this.strict = capacity == 1 || strict;
     }
   
-    request(process: IdentifiableProcess, capacity = 1): Result | Ticket {
+    request(process: ManagedProcess, capacity = 1): Result | Ticket {
         if(capacity > this.maxCapacity) return Result.ExceedsCapacity;
         else {
             const usageLog: ResourceUsageLog = {pid:process.id, rid:this.index, rT:this.sim.time, cap:capacity};
@@ -262,7 +273,7 @@ class ResourceCore {
         }
     }
   
-    release(processId: number, capacity: number = 1): IdentifiableProcess[] {
+    release(processId: number, capacity: number = 1): ManagedProcess[] {
         const usageLog = this.#activeProcesses.get(processId)!;
         usageLog.lT = this.sim.time;
         usageLog.fr = capacity;
@@ -272,8 +283,8 @@ class ResourceCore {
         return this.#fittingProcesses();
     }
 
-    #fittingProcesses(): IdentifiableProcess[] {
-        const processes: IdentifiableProcess[] = [];
+    #fittingProcesses(): ManagedProcess[] {
+        const processes: ManagedProcess[] = [];
         if(this.#q.length > 0) {
             let i=0;
             while(i < (this.strict ? Math.min(1, this.#q.length) : this.#q.length)){
@@ -292,12 +303,12 @@ class ResourceCore {
         return processes;
     }
 
-    addCapacity(capacity: number): IdentifiableProcess[] {
+    addCapacity(capacity: number): ManagedProcess[] {
         this.#availableCapacity += capacity;
         return this.#fittingProcesses();
     }
   
-    remove(id: number): IdentifiableProcess | undefined {
+    remove(id: number): ManagedProcess | undefined {
         const pos = this.#binarySearch(id);
         if(pos !== undefined) {
             const [_, process] = this.#q.removeOne(pos)!;
@@ -358,10 +369,19 @@ export class Throttle {
     }
 }
 
-function* generate(sim: SimCore, process:ProcessGenerator, mean:number, plusOrMinus:number, delay:number): Process {
+function* generate(sim: SimCore, process:ProcessGenerator, mean:number, plusOrMinus:number, delay:number=0): Process {
     yield delay;
     while(true) {
         yield randomInt(mean, plusOrMinus);
+        sim.spawn(process);
+    }
+}
+
+function* generatePoisson(sim: SimCore, process:ProcessGenerator, lambda:number, delay:number): Process {
+    yield delay;
+    while(true) {
+        const nxt = -Math.log(1 - Math.random()) / lambda;
+        yield nxt;
         sim.spawn(process);
     }
 }
