@@ -14,6 +14,9 @@ export {
     customDistribution,
     randomInt,
     uniformInt,
+    setupSampleListener,
+    runScenarios,
+    writeResultsSync,
 } from "./src/sim.ts";
 
 export {
