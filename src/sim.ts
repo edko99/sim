@@ -1,3 +1,6 @@
+/// <reference no-default-lib="true" />
+/// <reference lib="deno.worker" />
+
 import {BinaryHeap, ascend} from "@std/data-structures";
 import Denque from "npm:denque@2.1.0";
 
@@ -407,4 +410,40 @@ export function customDistribution<T>(...point:[weight:number, value:T][]): (ran
         }
         return normalized[i-1][1];
     }
+}
+
+export function setupSampleListener<P, R>(sampler: (param:P) => R) {
+    self.onmessage = (evt) => {
+        const {runs, parameters} = evt.data as {runs:number, parameters:P};
+        const samples: R[] = [];
+        for(let i=0; i<runs; ++i){
+            const sample = sampler(parameters);
+            samples.push(sample);
+        }
+        self.postMessage(samples);
+        self.close();
+    }
+}
+
+export async function runScenarios<P, R>(srcPath:string, scenarios:P[], runs:number): Promise<R[][]> {
+    return await Promise.all(scenarios.map(scenario => new Promise((resolve, reject) => {
+        const worker = new Worker(srcPath, {type:"module"});
+        worker.onmessage = evt => resolve(evt.data);
+        worker.onerror = reject;
+        worker.postMessage({runs, parameters:scenario});
+    }))) as R[][];
+}
+
+export function writeResultsSync(results: number[][], fname: string) {
+    if(results.length == 0) return;
+    let csv = "";
+    const runs = results[0].length;
+    for(let i=0; i<runs; ++i){
+        if(i>0) csv += "\n";
+        for(let j=0; j<results.length; ++j){
+            if(j>0) csv += ",";
+            csv += results[j][i];
+        }
+    }
+    Deno.writeTextFileSync(fname, csv);
 }
