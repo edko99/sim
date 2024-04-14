@@ -96,7 +96,7 @@ Deno.test("BinaryHeap handles edge case 3", () => {
 });
 
 Deno.test("BinaryHeap handles README example", () => {
-  const naiveId = (x:number) => x; // only works because there are no duplicate value
+  const naiveId = (x:number) => x; // only works because there are no duplicate values
   const minHeap = new BinaryHeap<number>(ascend, naiveId);
   minHeap.push(4, 1, 3, 5, 2);
   assertEquals(minHeap.peek(), 1);
@@ -105,3 +105,37 @@ Deno.test("BinaryHeap handles README example", () => {
   assertEquals([...minHeap], []);
 });
 
+// Test deletions
+
+Deno.test("BinaryHeap handles removal of first value", () => {
+  const naiveId = (x:number) => x; // only works because there are no duplicate values
+  const minHeap = new BinaryHeap<number>(ascend, naiveId);
+  minHeap.push(4, 1, 3, 5, 2);
+  minHeap.remove(1);
+  assertEquals(minHeap.peek(), 2);
+  assertEquals(minHeap.pop(), 2);
+  assertEquals([...minHeap], [3, 4, 5]);
+  assertEquals([...minHeap], []);
+});
+
+Deno.test("BinaryHeap handles removal of value in the middle", () => {
+  const naiveId = (x:number) => x; // only works because there are no duplicate values
+  const minHeap = new BinaryHeap<number>(ascend, naiveId);
+  minHeap.push(4, 1, 3, 5, 2);
+  minHeap.remove(3);
+  assertEquals(minHeap.peek(), 1);
+  assertEquals(minHeap.pop(), 1);
+  assertEquals([...minHeap], [2, 4, 5]);
+  assertEquals([...minHeap], []);
+});
+
+Deno.test("BinaryHeap handles removal of last value", () => {
+  const naiveId = (x:number) => x; // only works because there are no duplicate values
+  const minHeap = new BinaryHeap<number>(ascend, naiveId);
+  minHeap.push(4, 1, 3, 5, 2);
+  minHeap.remove(5);
+  assertEquals(minHeap.peek(), 1);
+  assertEquals(minHeap.pop(), 1);
+  assertEquals([...minHeap], [2, 3, 4]);
+  assertEquals([...minHeap], []);
+});
