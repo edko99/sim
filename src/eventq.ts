@@ -74,9 +74,13 @@ export class BinaryHeap<T> implements Iterable<T> {
   /** Adds values to the binary heap. */
   push(...values: T[]): number {
     for (const value of values) {
+      const id = this.id(value);
+      if(this.#positions.has(id)){
+        throw new Error(`Cannot push value with duplicate id ${id}`);
+      }
       let index: number = this.#data.length;
       let parent: number = getParentIndex(index);
-      this.#positions.set(this.id(value), this.#data.length);
+      this.#positions.set(id, this.#data.length);
       this.#data.push(value);
       while (
         index !== 0 && this.compare(this.#data[index]!, this.#data[parent]!) < 0
