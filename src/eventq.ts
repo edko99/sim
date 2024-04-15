@@ -47,6 +47,7 @@ export class BinaryHeap<T> implements Iterable<T> {
   }
 
   #pop(index: number): T | undefined {
+    if(this.#data.length == 0) return undefined;
     const size: number = this.#data.length - 1;
     this.#swap(index, size);
     let parent = 0;
@@ -80,8 +81,8 @@ export class BinaryHeap<T> implements Iterable<T> {
       }
       let index: number = this.#data.length;
       let parent: number = getParentIndex(index);
-      this.#positions.set(id, this.#data.length);
       this.#data.push(value);
+      this.#positions.set(id, index);
       while (
         index !== 0 && this.compare(this.#data[index]!, this.#data[parent]!) < 0
       ) {
@@ -116,7 +117,6 @@ export class BinaryHeap<T> implements Iterable<T> {
   }
 
   #swap(a: number, b: number) {
-    if(a < 0 || b < 0) return;
     const a_value = this.#data[a];
     const b_value = this.#data[b];
     this.#data[a] = b_value;
