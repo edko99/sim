@@ -1,9 +1,5 @@
-import { assertEquals, fail } from "https://deno.land/std@0.219.0/assert/mod.ts";
-import { Process, Sim } from "../mod.ts";
-import { Result } from "../mod.ts";
-import { PREEMPT } from "../mod.ts";
-import { Throttle } from "../mod.ts";
-import { assert } from "https://deno.land/std@0.219.0/assert/assert.ts";
+import { assertEquals, fail, assert } from "https://deno.land/std@0.219.0/assert/mod.ts";
+import { Process, Sim, Result, PREEMPT, Throttle } from "../mod.ts";
 
 Deno.test("One process is scheduled correctly", () => {
     const sim = new Sim();
