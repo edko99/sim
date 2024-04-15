@@ -1,7 +1,8 @@
 /// <reference no-default-lib="true" />
 /// <reference lib="deno.worker" />
 
-import {BinaryHeap, ascend} from "@std/data-structures";
+//import {BinaryHeap, ascend} from "@std/data-structures";
+import {BinaryHeap, ascend} from "./eventq.ts";
 import Denque from "npm:denque@2.1.0";
 
 export type Action = number | Request | Release | Preempt | Throttle;
@@ -70,7 +71,10 @@ class SimCore {
     #resourceIndex = 0;
 
     time = 0;
-    timeline = new BinaryHeap<[number, ManagedProcess, Result]>(([a,_a],[b,_b]) => ascend(a,b));
+    timeline = new BinaryHeap<[number, ManagedProcess, Result]>(
+        ([a,_a,_ra],[b,_b,_rb]) => ascend(a,b),
+        ([_t,mp,_r]) => mp.id
+    );
     resources: ResourceCore[] = [];
     #resourceMap = new Map<string, ResourceCore>();
 

@@ -139,3 +139,39 @@ Deno.test("BinaryHeap handles removal of last value", () => {
   assertEquals([...minHeap], [2, 3, 4]);
   assertEquals([...minHeap], []);
 });
+
+Deno.test("BinaryHeap handles multiple removals of first values", () => {
+  const naiveId = (x:number) => x; // only works because there are no duplicate values
+  const minHeap = new BinaryHeap<number>(ascend, naiveId);
+  minHeap.push(4, 1, 3, 5, 2);
+  minHeap.remove(1);
+  minHeap.remove(2);
+  assertEquals(minHeap.peek(), 3);
+  assertEquals(minHeap.pop(), 3);
+  assertEquals([...minHeap], [4, 5]);
+  assertEquals([...minHeap], []);
+});
+
+Deno.test("BinaryHeap handles removal of values in the middle", () => {
+  const naiveId = (x:number) => x; // only works because there are no duplicate values
+  const minHeap = new BinaryHeap<number>(ascend, naiveId);
+  minHeap.push(4, 1, 3, 5, 2);
+  minHeap.remove(3);
+  minHeap.remove(4);
+  assertEquals(minHeap.peek(), 1);
+  assertEquals(minHeap.pop(), 1);
+  assertEquals([...minHeap], [2, 5]);
+  assertEquals([...minHeap], []);
+});
+
+Deno.test("BinaryHeap handles multiple removals of last values", () => {
+  const naiveId = (x:number) => x; // only works because there are no duplicate values
+  const minHeap = new BinaryHeap<number>(ascend, naiveId);
+  minHeap.push(4, 1, 3, 5, 2);
+  minHeap.remove(5);
+  minHeap.remove(4);
+  assertEquals(minHeap.peek(), 1);
+  assertEquals(minHeap.pop(), 1);
+  assertEquals([...minHeap], [2, 3]);
+  assertEquals([...minHeap], []);
+});

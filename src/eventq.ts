@@ -116,6 +116,7 @@ export class BinaryHeap<T> implements Iterable<T> {
   }
 
   #swap(a: number, b: number) {
+    if(a < 0 || b < 0) return;
     const a_value = this.#data[a];
     const b_value = this.#data[b];
     this.#data[a] = b_value;
