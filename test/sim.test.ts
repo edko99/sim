@@ -3,6 +3,7 @@ import { Process, Sim } from "../mod.ts";
 import { Result } from "../mod.ts";
 import { PREEMPT } from "../mod.ts";
 import { Throttle } from "../mod.ts";
+import { assert } from "https://deno.land/std@0.219.0/assert/assert.ts";
 
 Deno.test("One process is scheduled correctly", () => {
     const sim = new Sim();
@@ -163,4 +164,26 @@ Deno.test("Throttling", () => {
     for(let i=0; i<10; ++i) sim.spawn(agent);
     sim.run();
     assertEquals(exitTime, [0, 0, 0, 0, 2, 2, 2, 2, 4, 4]);
+});
+
+Deno.test("Interrupt", () => {
+    const sim = new Sim();
+    let interruptorContinues = false;
+    let wasInterrupted = false;
+    function* interrupted(id: number): Process {
+        function* interruptor(_: number): Process {
+            yield 10;
+            yield sim.interrupt(id);
+            assertEquals(sim.time, 10);
+            interruptorContinues = true;
+        }
+        sim.spawn(interruptor);
+        const result = yield 20;
+        assertEquals(sim.time, 10);
+        wasInterrupted = (result === Result.Interrupted);
+    }
+    sim.spawn(interrupted);
+    sim.run();
+    assert(wasInterrupted);
+    assert(interruptorContinues);
 });

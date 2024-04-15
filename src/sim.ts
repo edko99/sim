@@ -1,17 +1,17 @@
 /// <reference no-default-lib="true" />
 /// <reference lib="deno.worker" />
 
-//import {BinaryHeap, ascend} from "@std/data-structures";
 import {BinaryHeap, ascend} from "./eventq.ts";
 import Denque from "npm:denque@2.1.0";
 
-export type Action = number | Request | Release | Preempt | Throttle;
+export type Action = number | Request | Release | Preempt | Interrupt | Throttle;
 
 export enum Result {
     OK,
     ExceedsCapacity,
     Preempted,
     Throttled,
+    Interrupted,
 }
 
 export type Process = Generator<Action, void, Result>;
@@ -23,6 +23,7 @@ type ManagedProcess = Process & {readonly id: number, readonly impatience?: Impa
 type Request = {kind:"request", resource:Resource, capacity:number, impatience:ProcessGenerator|undefined}
 type Release = {kind:"release", resource:Resource, capacity:number}
 type Preempt = {kind:"preempt"}
+type Interrupt = {kind: "interrupt", processId: number}
 
 export const PREEMPT: Preempt = {kind:"preempt"};
 
@@ -61,6 +62,10 @@ export class Sim {
         this.#sim.addCapacity(resource, capacity);
     }
 
+    interrupt(processId: number): Interrupt {
+        return this.#sim.interrupt(processId);
+    }
+
     logs(): ResourceUsageLog[] {
         return this.#sim.logs();
     }
@@ -71,7 +76,7 @@ class SimCore {
     #resourceIndex = 0;
 
     time = 0;
-    timeline = new BinaryHeap<[number, ManagedProcess, Result]>(
+    eventQueue = new BinaryHeap<[number, ManagedProcess, Result]>(
         ([a,_a,_ra],[b,_b,_rb]) => ascend(a,b),
         ([_t,mp,_r]) => mp.id
     );
@@ -106,7 +111,7 @@ class SimCore {
     }
 
     run(totalTime: number|undefined = undefined){
-        let event = this.timeline.pop();
+        let event = this.eventQueue.pop();
         while(event){
             const [time, process, result] = event;
             if(totalTime !== undefined &&  time >= totalTime){
@@ -124,7 +129,7 @@ class SimCore {
                     const wait = cmd.throttle(time);
                     this.#schedule(wait, process, wait == 0 ? Result.OK : Result.Throttled);
                 }
-                else if(cmd.kind == "request"){
+                else if(cmd.kind === "request"){
                     if(process.impatience !== undefined) throw "Impatience processes cannot request resources";
                     const resource = this.resources[cmd.resource.index];
                     const result = resource.request(process, cmd.capacity);
@@ -140,13 +145,13 @@ class SimCore {
                         this.#schedule(0, process, result);
                     }
                 }
-                else if(cmd.kind == "release") {
+                else if(cmd.kind === "release") {
                     if(process.impatience !== undefined) throw "Impatience processes cannot release resources";
                     this.#schedule(0, process, Result.OK);
                     const resource = this.resources[cmd.resource.index];
                     resource.release(process.id, cmd.capacity).forEach(nextProcess => this.#schedule(0, nextProcess, Result.OK));
                 }
-                else if(cmd.kind == "preempt") {
+                else if(cmd.kind === "preempt") {
                     if(process.impatience === undefined) throw "Only impatience processes can preempt";
                     const resource = this.resources[process.impatience!.resourceId];
                     const preemptedProcess = resource.remove(process.impatience!.ticket);
@@ -154,8 +159,16 @@ class SimCore {
                         this.#schedule(0, preemptedProcess, Result.Preempted);
                     }
                 }
+                else if(cmd.kind === "interrupt") {
+                    const event = this.eventQueue.remove(cmd.processId);
+                    if(event){
+                        const [i_time, i_process, i_result] = event;
+                        this.#schedule(0, process, Result.OK);
+                        this.#schedule(0, i_process, time == i_time ? i_result : Result.Interrupted);
+                    }
+                }
             }
-            event = this.timeline.pop();
+            event = this.eventQueue.pop();
         }
         this.resources.forEach(r => {
             r.completePendingLogs();
@@ -185,12 +198,16 @@ class SimCore {
         r.addCapacity(capacity).forEach(nextProcess => this.#schedule(0, nextProcess, Result.OK));
     }
 
+    interrupt(processId: number): Interrupt {
+        return {kind: "interrupt", processId}
+    }
+
     logs(): ResourceUsageLog[] {
         return this.resources.flatMap(r => r.log);
     }
 
     #schedule(timeFromNow: number, process: ManagedProcess, result: Result) {
-        this.timeline.push([this.time + timeFromNow, process, result]);
+        this.eventQueue.push([this.time + timeFromNow, process, result]);
     }
 }
 
