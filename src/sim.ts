@@ -404,10 +404,17 @@ function* generate(sim: SimCore, process:ProcessGenerator, mean:number, plusOrMi
 function* generatePoisson(sim: SimCore, process:ProcessGenerator, lambda:number, delay:number): Process {
     yield delay;
     while(true) {
-        const nxt = -Math.log(1 - Math.random()) / lambda;
-        yield nxt;
+        yield expovariate(lambda);
         sim.spawn(process);
     }
+}
+
+export function expovariate(lambda: number, random: () => number = Math.random) {
+    return -Math.log(1 - random()) / lambda
+}
+
+export function uniform(a: number, b: number, random: () => number = Math.random): number {
+    return a + (b - a) * random();
 }
 
 export function randomInt(mean:number, plusOrMinus:number, random: () => number = Math.random): number {

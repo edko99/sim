@@ -12,6 +12,8 @@ export {
     Resource,
     Throttle,
     customDistribution,
+    expovariate,
+    uniform,
     randomInt,
     uniformInt,
     setupSampleListener,
