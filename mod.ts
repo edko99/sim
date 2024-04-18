@@ -31,3 +31,5 @@ export {
     vconcat,
     hconcat,
 } from "./src/vega.ts";
+
+export {analyzeResults} from "./src/analysis.ts";
