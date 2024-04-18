@@ -130,7 +130,6 @@ class SimCore {
                     this.#schedule(wait, process, wait == 0 ? Result.OK : Result.Throttled);
                 }
                 else if(cmd.kind === "request"){
-                    if(process.impatience !== undefined) throw "Impatience processes cannot request resources";
                     const resource = this.resources[cmd.resource.index];
                     const result = resource.request(process, cmd.capacity);
                     if(typeof result !== "number") {
@@ -146,7 +145,6 @@ class SimCore {
                     }
                 }
                 else if(cmd.kind === "release") {
-                    if(process.impatience !== undefined) throw "Impatience processes cannot release resources";
                     this.#schedule(0, process, Result.OK);
                     const resource = this.resources[cmd.resource.index];
                     resource.release(process.id, cmd.capacity).forEach(nextProcess => this.#schedule(0, nextProcess, Result.OK));
