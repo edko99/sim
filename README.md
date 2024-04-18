@@ -1,8 +1,7 @@
 # sim
-Discrete event simulation library, inspired by GPSS, to be used in Deno projects.
+Discrete event simulation library, inspired by GPSS and SimPy.
 
 ## Usage
-Deno import
 ```js
 import { Process, Sim, uniformInt } from "https://deno.land/x/sim@v0.1.2-alpha/mod.ts";
 
@@ -20,6 +19,8 @@ sim.generatePoisson(agent, 1 / 5); // generate one agent every 5 units of time
 sim.run(30); // start the simulation, and run it for 30 units of time
 ```
 
+Check the examples folder for other models.
+
 ## Current capabilities
 - Scheduling of events with simulated time
 - Resources, with impatience
@@ -28,6 +29,6 @@ sim.run(30); // start the simulation, and run it for 30 units of time
 - Basic analysis (multiple runs, ANOVA, etc.)
 - Basic charts (using Vega-Lite)
 
-## Intended
-- Better docs (for now, see tests)
+## TO-DO
+- More examples
 - Ability for processes to get more information about the simulated environment (resource stats, etc.)
