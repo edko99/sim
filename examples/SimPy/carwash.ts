@@ -26,7 +26,7 @@ const machine = sim.resource("Machine", NUM_MACHINES);
 
 let carCount = 0;
 
-function* car(_: number): Process {
+function* car(): Process {
     const name = `Car ${carCount++}`;
     console.log(`${name} arrives at the carwash at ${sim.time.toFixed(2)}`);
     yield machine.request();

@@ -22,7 +22,7 @@ const sim = new Sim();
 
 const counter = sim.resource("Counter");
 
-function* source(_: number): Process {
+function* source(): Process {
     for(let i=0; i<NEW_CUSTOMERS; ++i){
         sim.spawn(customer);
         yield expovariate(1 / INTERVAL_CUSTOMERS);
@@ -31,7 +31,7 @@ function* source(_: number): Process {
 
 let customerId = 0;
 
-function* customer(_: number): Process {
+function* customer(): Process {
     const arrive = sim.time;
     const name = `Customer 0${++customerId}`;
     console.log(`${arrive.toFixed(4)} ${name}: Here I am`);
@@ -48,7 +48,7 @@ function* customer(_: number): Process {
     }
 }
 
-function* impatience(_:number): Process {
+function* impatience(): Process {
     const patience = uniform(MIN_PATIENCE, MAX_PATIENCE);
     yield patience;
     yield PREEMPT;

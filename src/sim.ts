@@ -15,7 +15,7 @@ export enum Result {
 }
 
 export type Process = Generator<Action, void, Result>;
-export type ProcessGenerator = (id:number) => Process;
+export type ProcessGenerator = (() => Process) | ((id:number) => Process); 
 
 type Impatience = {ticket: number, resourceId: number}
 type ManagedProcess = Process & {readonly id: number, readonly impatience?: Impatience};

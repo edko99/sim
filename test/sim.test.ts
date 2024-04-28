@@ -4,7 +4,7 @@ import { Process, Sim, Result, PREEMPT, Throttle } from "../mod.ts";
 Deno.test("One process is scheduled correctly", () => {
     const sim = new Sim();
     let count = 0;
-    function* process(_id: number): Process {
+    function* process(): Process {
         assertEquals(sim.time, 3);
         yield 1
         assertEquals(sim.time, 4);
@@ -19,7 +19,7 @@ Deno.test("Multiple processes are scheduled correctly", () => {
     const sim = new Sim();
     let count = 0;
     function spawn(start:number) {
-        function* process(_id: number): Process {
+        function* process(): Process {
             assertEquals(sim.time, start);
             yield 1
             assertEquals(sim.time, start + 1);
@@ -38,7 +38,7 @@ Deno.test("Time increases", () => {
     const sim = new Sim();
     const timestamps: number[] = [];
     function spawn(start:number) {
-        function* process(_id: number): Process {
+        function* process(): Process {
             timestamps.push(sim.time);
             yield 2
             timestamps.push(sim.time);
@@ -55,18 +55,18 @@ Deno.test("Impatience", () => {
     const sim = new Sim();
     const resource = sim.resource("resource");
     let ran = false;
-    function* initialOccupant(_id: number): Process {
+    function* initialOccupant(): Process {
         const result = yield resource.requestImpatient(impatience);
         assertEquals(result, Result.OK);
         yield 100;
     }
-    function* main(_id: number): Process {
+    function* main(): Process {
         const result = yield resource.requestImpatient(impatience)
         assertEquals(result, Result.Preempted);
         assertEquals(sim.time, 10);
         ran = true;
     }
-    function* impatience(_id: number): Process {
+    function* impatience(): Process {
         yield 10;
         yield PREEMPT;
     }
@@ -80,11 +80,11 @@ Deno.test("Liberating capacity advances the entire non-stric queue", () => {
     const sim = new Sim();
     const res = sim.resource("resource", 2, false);
     let count = 0;
-    function* first(_id:number): Process {
+    function* first(): Process {
         yield res.request(2);
         yield res.release(2);
     }
-    function* successor(_id:number): Process {
+    function* successor(): Process {
         yield res.request(1);
         ++count;
     }
@@ -99,11 +99,11 @@ Deno.test("Liberating capacity advances the entire queue head (strict)", () => {
     const sim = new Sim();
     const res = sim.resource("resource", 2, true);
     let count = 0;
-    function* first(_id:number): Process {
+    function* first(): Process {
         yield res.request(2);
         yield res.release(2);
     }
-    function* successor(_id:number): Process {
+    function* successor(): Process {
         yield res.request(1);
         ++count;
     }
@@ -118,25 +118,25 @@ Deno.test("Impatience causes non-strict resource queue to advance", () => {
     const sim = new Sim();
     const res = sim.resource("resource", 4, false);
     let count = 0;
-    function* first(_:number): Process {
+    function* first(): Process {
         yield res.request(2);
         yield 20;
     }
-    function* second(_:number): Process {
+    function* second(): Process {
         const result = yield res.requestImpatient(impatience, 4);
         assertEquals(result, Result.Preempted);
         ++count;
     }
-    function* impatience(_:number): Process {
+    function* impatience(): Process {
         yield 10;
         yield PREEMPT;
         fail("Impatience process should have not reached here");
     }
-    function* third(_:number): Process {
+    function* third(): Process {
         yield res.request(4);
         fail("Third process should have not reached here");
     }
-    function* small(_:number): Process {
+    function* small(): Process {
         yield res.request(1);
         ++count;
     }
@@ -157,13 +157,13 @@ Deno.test("Processes are unqueued by priority", () => {
     const prioResource = sim.resource("prioritized", 1, true, 3);
     const pr_agent = () => {
         const prio = p.shift();
-        return function* agent(_: number): Process {
+        return function* agent(): Process {
             yield prioResource.request(1, prio!);
             yield prioResource.release();
             result.push(prio!);
         }
     }
-    function* initial(_:number): Process {
+    function* initial(): Process {
         yield prioResource.request();
         yield p_len + 1;
         yield prioResource.release();
@@ -178,7 +178,7 @@ Deno.test("Throttling", () => {
     const throttle = new Throttle(4, 2);
     const sim = new Sim();
     const exitTime: number[] = [];
-    function* agent(_:number): Process {
+    function* agent(): Process {
         yield throttle;
         exitTime.push(sim.time);
     }
@@ -192,7 +192,7 @@ Deno.test("Interrupt", () => {
     let interruptorContinues = false;
     let wasInterrupted = false;
     function* interrupted(id: number): Process {
-        function* interruptor(_: number): Process {
+        function* interruptor(): Process {
             yield 10;
             yield sim.interrupt(id);
             assertEquals(sim.time, 10);
