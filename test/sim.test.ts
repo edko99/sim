@@ -149,6 +149,31 @@ Deno.test("Impatience causes non-strict resource queue to advance", () => {
     assertEquals(count, 3);
 });
 
+Deno.test("Processes are unqueued by priority", () => {
+    const p = [3, 1, 2, 1, 2, 3, 2, 1];
+    const p_len = p.length;
+    const result:number[] = [];
+    const sim = new Sim();
+    const prioResource = sim.resource("prioritized", 1, true, 3);
+    const pr_agent = () => {
+        const prio = p.shift();
+        return function* agent(_: number): Process {
+            yield prioResource.request(1, prio!);
+            yield prioResource.release();
+            result.push(prio!);
+        }
+    }
+    function* initial(_:number): Process {
+        yield prioResource.request();
+        yield p_len + 1;
+        yield prioResource.release();
+    }
+    sim.spawn(initial);
+    for(let i=0; i<p_len; ++i) sim.spawn(pr_agent(), i+1);
+    sim.run();
+    assertEquals(result, [1, 1, 1, 2, 2, 2, 3, 3]);
+});
+
 Deno.test("Throttling", () => {
     const throttle = new Throttle(4, 2);
     const sim = new Sim();

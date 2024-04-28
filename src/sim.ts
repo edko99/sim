@@ -20,7 +20,7 @@ export type ProcessGenerator = (id:number) => Process;
 type Impatience = {ticket: number, resourceId: number}
 type ManagedProcess = Process & {readonly id: number, readonly impatience?: Impatience};
 
-type Request = {kind:"request", resource:Resource, capacity:number, impatience:ProcessGenerator|undefined}
+type Request = {kind:"request", resource:Resource, capacity:number, priority:number, impatience:ProcessGenerator|undefined}
 type Release = {kind:"release", resource:Resource, capacity:number}
 type Preempt = {kind:"preempt"}
 type Interrupt = {kind: "interrupt", processId: number}
@@ -42,8 +42,8 @@ export class Sim {
         return this.#sim.generatePoisson(process, lambda, delay);
     }
 
-    resource(name:string, capacity = 1, strict = true): Resource {
-        return this.#sim.resource(name, capacity, strict);
+    resource(name:string, capacity = 1, strict = true, priorities = 1): Resource {
+        return this.#sim.resource(name, capacity, strict, priorities);
     }
 
     run(totalTime: number|undefined = undefined){
@@ -103,8 +103,8 @@ class SimCore {
         this.#schedule(0, idProcess, Result.OK);
     }
 
-    resource(name:string, capacity = 1, strict = true): Resource {
-        const resource = new ResourceCore(this, this.#resourceIndex++, name, capacity, strict);
+    resource(name:string, capacity = 1, strict = true, priorities = 1): Resource {
+        const resource = new ResourceCore(this, this.#resourceIndex++, name, capacity, strict, priorities);
         this.resources.push(resource);
         this.#resourceMap.set(name, resource);
         return new Resource(resource);
@@ -131,7 +131,7 @@ class SimCore {
                 }
                 else if(cmd.kind === "request"){
                     const resource = this.resources[cmd.resource.index];
-                    const result = resource.request(process, cmd.capacity);
+                    const result = resource.request(process, cmd.capacity, cmd.priority);
                     if(typeof result !== "number") {
                         if(cmd.impatience !== undefined) {
                             const id = ++this.#processId;
@@ -228,12 +228,12 @@ export class Resource {
         return this.#resource.log;
     }
 
-    request(capacity:number = 1): Request {
-        return {kind:"request", resource:this, capacity, impatience: undefined}
+    request(capacity:number = 1, priority:number = 1): Request {
+        return {kind:"request", resource:this, capacity, priority, impatience: undefined}
     }
 
-    requestImpatient(impatience:ProcessGenerator, capacity:number = 1):Request {
-        return {kind:"request", resource:this, capacity, impatience}
+    requestImpatient(impatience:ProcessGenerator, capacity:number = 1, priority:number = 1):Request {
+        return {kind:"request", resource:this, capacity, priority, impatience}
     }
 
     release(capacity:number = 1): Release {
@@ -244,6 +244,7 @@ export class Resource {
 export interface ResourceUsageLog {
     pid: number,  // process id
     rid: number,  // resource id
+    pri: number,  // priority
     rT: number,   // timestamp of request
     cap: number,  // requested capacity
     xqT?: number, // timestamp when queue is exited
@@ -253,7 +254,7 @@ export interface ResourceUsageLog {
 }
 
 type Ticket = {ticket:number};
-  
+
 class ResourceCore {
     readonly sim: SimCore;
     readonly index: number;
@@ -263,23 +264,24 @@ class ResourceCore {
     
     #availableCapacity: number;
     #ticketNumber = 0;
-    #q = new Denque<[number, ManagedProcess]>();
+    #q: Denque<[number, ManagedProcess]>[];
     #activeProcesses = new Map<number, ResourceUsageLog>();
     readonly log: ResourceUsageLog[] = [];
   
-    constructor(sim:SimCore, index:number, name:string, capacity:number, strict:boolean) {
+    constructor(sim:SimCore, index:number, name:string, capacity:number, strict:boolean, priorities:number) {
         this.sim = sim;
         this.index = index;
         this.name = name;
         this.maxCapacity = capacity;
         this.#availableCapacity = capacity;
         this.strict = capacity == 1 || strict;
+        this.#q = Array.from({length: priorities}, _ => new Denque<[number, ManagedProcess]>());
     }
   
-    request(process: ManagedProcess, capacity = 1): Result | Ticket {
+    request(process: ManagedProcess, capacity = 1, priority = 1): Result | Ticket {
         if(capacity > this.maxCapacity) return Result.ExceedsCapacity;
         else {
-            const usageLog: ResourceUsageLog = {pid:process.id, rid:this.index, rT:this.sim.time, cap:capacity};
+            const usageLog: ResourceUsageLog = {pid:process.id, pri: priority, rid:this.index, rT:this.sim.time, cap:capacity};
             this.#activeProcesses.set(process.id, usageLog);
             if(capacity <= this.#availableCapacity){
                 usageLog.xqT = this.sim.time;
@@ -289,7 +291,7 @@ class ResourceCore {
             }
             else {
                 const ticket = ++this.#ticketNumber;
-                this.#q.push([ticket, process]);
+                this.#q[priority-1].push([ticket, process]);
                 return {ticket};
             }
         }
@@ -307,19 +309,22 @@ class ResourceCore {
 
     #fittingProcesses(): ManagedProcess[] {
         const processes: ManagedProcess[] = [];
-        if(this.#q.length > 0) {
-            let i=0;
-            while(i < (this.strict ? Math.min(1, this.#q.length) : this.#q.length)){
-                const [_, process] = this.#q.peekAt(i)!;
-                const usageLog = this.#activeProcesses.get(process.id)!;
-                if(usageLog.cap <= this.#availableCapacity) {
-                    usageLog.xqT = this.sim.time;
-                    usageLog.av = this.#availableCapacity;
-                    this.#q.removeOne(i);
-                    this.#availableCapacity -= usageLog.cap;
-                    processes.push(process);
+        for(let priority=0; priority<this.#q.length; ++priority){
+            const q = this.#q[priority];
+            if(q.length > 0) {
+                let i=0;
+                while(i < (this.strict ? Math.min(1, q.length) : q.length)){
+                    const [_, process] = q.peekAt(i)!;
+                    const usageLog = this.#activeProcesses.get(process.id)!;
+                    if(usageLog.cap <= this.#availableCapacity) {
+                        usageLog.xqT = this.sim.time;
+                        usageLog.av = this.#availableCapacity;
+                        q.removeOne(i);
+                        this.#availableCapacity -= usageLog.cap;
+                        processes.push(process);
+                    }
+                    else ++i;
                 }
-                else ++i;
             }
         }
         return processes;
@@ -331,14 +336,16 @@ class ResourceCore {
     }
   
     remove(id: number): ManagedProcess | undefined {
-        const pos = this.#binarySearch(id);
-        if(pos !== undefined) {
-            const [_, process] = this.#q.removeOne(pos)!;
-            const usageLog = this.#activeProcesses.get(process.id)!;
-            usageLog.xqT = this.sim.time;
-            this.#activeProcesses.delete(process.id);
-            this.log.push(usageLog);
-            return process;
+        for(let priority=0; priority<this.#q.length; ++priority){
+            const pos = this.#binarySearch(id, priority);
+            if(pos !== undefined) {
+                const [_, process] = this.#q[priority].removeOne(pos)!;
+                const usageLog = this.#activeProcesses.get(process.id)!;
+                usageLog.xqT = this.sim.time;
+                this.#activeProcesses.delete(process.id);
+                this.log.push(usageLog);
+                return process;
+            }
         }
     }
 
@@ -347,17 +354,18 @@ class ResourceCore {
         this.#activeProcesses.clear();
     }
 
-    #binarySearch(id: number): number | undefined {
-        if(this.#q.isEmpty()) return;
+    #binarySearch(id: number, prio: number): number | undefined {
+        const q = this.#q[prio];
+        if(q.isEmpty()) return;
 
         let start = 0;
         let end = this.#q.length - 1;
-        if(id < this.#q.peekAt(start)![0]) return;
-        if(id > this.#q.peekAt(end)![0]) return;
+        if(id < q.peekAt(start)![0]) return;
+        if(id > q.peekAt(end)![0]) return;
 
         while(start <= end) {
             const mid = Math.floor((start + end) / 2);
-            const midval = this.#q.peekAt(mid)![0];
+            const midval = q.peekAt(mid)![0];
             if(id === midval) {
                 return mid;
             }
