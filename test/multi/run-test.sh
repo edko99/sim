@@ -1,1 +1,1 @@
-deno test --allow-read multi.ts
+deno test --allow-read --allow-env multi.ts
