@@ -83,34 +83,34 @@ class SimCore {
     resources: ResourceCore[] = [];
     #resourceMap = new Map<string, ResourceCore>();
 
-    spawn(procGen: ProcessGenerator, timeFromNow = 0){
+    spawn(procGen: ProcessGenerator, timeFromNow: number){
         const id = ++this.#processId;
         const idProcess = Object.assign(procGen(id), {id});
         this.#schedule(timeFromNow, idProcess, Result.OK);
     }
 
-    generate(process:ProcessGenerator, mean:number, plusOrMinus:number = 0, delay:number = 0) {
+    generate(process:ProcessGenerator, mean:number, plusOrMinus:number, delay:number) {
         const generator = generate(this, process, mean, plusOrMinus, delay);
         const id = ++this.#processId;
         const idProcess = Object.assign(generator, {id});
         this.#schedule(0, idProcess, Result.OK);
     }
 
-    generatePoisson(process:ProcessGenerator, lambda:number = 1, delay:number = 0) {
+    generatePoisson(process:ProcessGenerator, lambda:number, delay:number) {
         const generator = generatePoisson(this, process, lambda, delay);
         const id = ++this.#processId;
         const idProcess = Object.assign(generator, {id});
         this.#schedule(0, idProcess, Result.OK);
     }
 
-    resource(name:string, capacity = 1, strict = true, priorities = 1): Resource {
+    resource(name:string, capacity: number, strict: boolean, priorities: number): Resource {
         const resource = new ResourceCore(this, this.#resourceIndex++, name, capacity, strict, priorities);
         this.resources.push(resource);
         this.#resourceMap.set(name, resource);
         return new Resource(resource);
     }
 
-    run(totalTime: number|undefined = undefined){
+    run(totalTime: number|undefined){
         let event = this.eventQueue.pop();
         while(event){
             const [time, process, result] = event;
@@ -278,7 +278,7 @@ class ResourceCore {
         this.#q = Array.from({length: priorities}, _ => new Denque<[number, ManagedProcess]>());
     }
   
-    request(process: ManagedProcess, capacity = 1, priority = 1): Result | Ticket {
+    request(process: ManagedProcess, capacity: number, priority: number): Result | Ticket {
         if(capacity > this.maxCapacity) return Result.ExceedsCapacity;
         else {
             const usageLog: ResourceUsageLog = {pid:process.id, pri: priority, rid:this.index, rT:this.sim.time, cap:capacity};
@@ -297,7 +297,7 @@ class ResourceCore {
         }
     }
   
-    release(processId: number, capacity: number = 1): ManagedProcess[] {
+    release(processId: number, capacity: number): ManagedProcess[] {
         const usageLog = this.#activeProcesses.get(processId)!;
         usageLog.lT = this.sim.time;
         usageLog.fr = capacity;
@@ -403,7 +403,7 @@ function* generate(sim: SimCore, process:ProcessGenerator, mean:number, plusOrMi
     yield delay;
     while(true) {
         yield randomInt(mean, plusOrMinus);
-        sim.spawn(process);
+        sim.spawn(process, 0);
     }
 }
 
@@ -411,7 +411,7 @@ function* generatePoisson(sim: SimCore, process:ProcessGenerator, lambda:number,
     yield delay;
     while(true) {
         yield expovariate(lambda);
-        sim.spawn(process);
+        sim.spawn(process, 0);
     }
 }
 
