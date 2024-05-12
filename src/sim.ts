@@ -14,8 +14,15 @@ export enum Result {
     Interrupted,
 }
 
+export type VarGen = Generator<number, void, void>;
+
+type Identified = {id:number};
+type NoId<T> = T extends Identified ? never : T;
+
 export type Process = Generator<Action, void, Result>;
-export type ProcessGenerator = (() => Process) | ((id:number) => Process); 
+type ProcGenPlain = () => Process;
+type ProcGenCtx = (id:number) => Process;
+export type ProcessGenerator = ProcGenPlain | ProcGenCtx; 
 
 type Impatience = {ticket: number, resourceId: number}
 type ManagedProcess = Process & {readonly id: number, readonly impatience?: Impatience};
@@ -34,12 +41,8 @@ export class Sim {
         this.#sim.spawn(procGen, timeFromNow);
     }
 
-    generate(process:ProcessGenerator, mean:number, plusOrMinus:number = 0, delay:number = 0) {
-        return this.#sim.generate(process, mean, plusOrMinus, delay);
-    }
-
-    generatePoisson(process:ProcessGenerator, lambda:number = 1, delay:number = 0) {
-        return this.#sim.generatePoisson(process, lambda, delay);
+    generate(vargen:VarGen, process:ProcessGenerator, delay = 0) {
+        return this.#sim.generate(vargen, delay, process);
     }
 
     resource(name:string, capacity = 1, strict = true, priorities = 1): Resource {
@@ -89,15 +92,8 @@ class SimCore {
         this.#schedule(timeFromNow, idProcess, Result.OK);
     }
 
-    generate(process:ProcessGenerator, mean:number, plusOrMinus:number, delay:number) {
-        const generator = generate(this, process, mean, plusOrMinus, delay);
-        const id = ++this.#processId;
-        const idProcess = Object.assign(generator, {id});
-        this.#schedule(0, idProcess, Result.OK);
-    }
-
-    generatePoisson(process:ProcessGenerator, lambda:number, delay:number) {
-        const generator = generatePoisson(this, process, lambda, delay);
+    generate(vargen:VarGen, delay:number, process:ProcessGenerator) {
+        const generator = generate(this, vargen, delay, process);
         const id = ++this.#processId;
         const idProcess = Object.assign(generator, {id});
         this.#schedule(0, idProcess, Result.OK);
@@ -399,28 +395,20 @@ export class Throttle {
     }
 }
 
-function* generate(sim: SimCore, process:ProcessGenerator, mean:number, plusOrMinus:number, delay:number=0): Process {
+function* generate(sim: SimCore, vargen:VarGen, delay:number, process:ProcessGenerator): Process {
     yield delay;
-    while(true) {
-        yield randomInt(mean, plusOrMinus);
+    for(const v of vargen){
+        yield v;
         sim.spawn(process, 0);
     }
 }
 
-function* generatePoisson(sim: SimCore, process:ProcessGenerator, lambda:number, delay:number): Process {
-    yield delay;
-    while(true) {
-        yield expovariate(lambda);
-        sim.spawn(process, 0);
-    }
+export function* varExpo(lambda: number, random: () => number = Math.random) {
+    while(true) yield -Math.log(1 - random()) / lambda;
 }
 
-export function expovariate(lambda: number, random: () => number = Math.random) {
-    return -Math.log(1 - random()) / lambda
-}
-
-export function uniform(a: number, b: number, random: () => number = Math.random): number {
-    return a + (b - a) * random();
+export function* varUniform(a: number, b: number, random: () => number = Math.random) {
+    while(true) yield a + (b - a) * random();
 }
 
 export function randomInt(mean:number, plusOrMinus:number, random: () => number = Math.random): number {
