@@ -4,12 +4,12 @@
 import {BinaryHeap, ascend} from "./eventq.ts";
 import Denque from "npm:denque@2.1.0";
 
-export type Action = number | Request | Release | Preempt | Interrupt | Throttle;
+export type Action = number | Request | Release | Desist | Interrupt | Throttle;
 
 export enum Result {
     OK,
     ExceedsCapacity,
-    Preempted,
+    Desisted,
     Throttled,
     Interrupted,
 }
@@ -17,32 +17,53 @@ export enum Result {
 export type VarGen = Generator<number, void, void>;
 
 type Identified = {id:number};
-type NoId<T> = T extends Identified ? never : T;
+type WithoutId<T> = T extends Identified ? never : T;
+type WithId<T> = Required<T> & Identified;
 
 export type Process = Generator<Action, void, Result>;
-type ProcGenPlain = () => Process;
-type ProcGenCtx = (id:number) => Process;
-export type ProcessGenerator = ProcGenPlain | ProcGenCtx; 
+type ProcGenPlain = (() => Process) | ((id: number) => Process);
+type ProcGenCtx<Ctx extends Identified> = (ctx: Ctx) => Process;
+export type ProcessGenerator<Ctx extends Identified> = ProcGenPlain | ProcGenCtx<Ctx>; 
 
 type Impatience = {ticket: number, resourceId: number}
 type ManagedProcess = Process & {readonly id: number, readonly impatience?: Impatience};
 
-type Request = {kind:"request", resource:Resource, capacity:number, priority:number, impatience:ProcessGenerator|undefined}
+type Request = {kind:"request", resource:Resource, capacity:number, priority:number, impatience:ProcGenPlain|undefined}
 type Release = {kind:"release", resource:Resource, capacity:number}
-type Preempt = {kind:"preempt"}
+type Desist = {kind:"desist"}
 type Interrupt = {kind: "interrupt", processId: number}
 
-export const PREEMPT: Preempt = {kind:"preempt"};
+export const DESIST: Desist = {kind:"desist"};
+
+function assertType<T>(_x: unknown): asserts _x is T {}
 
 export class Sim {
     #sim = new SimCore();
 
-    spawn(procGen: ProcessGenerator, timeFromNow = 0){
-        this.#sim.spawn(procGen, timeFromNow);
+    spawn(procGen: ProcGenPlain, timeFromNow?: number): void;
+    spawn<T extends object>(procGen: ProcGenCtx<WithId<T>>, ctx: WithoutId<T>, timeFromNow?: number): void;
+    spawn<T extends object>(procGen: ProcessGenerator<WithId<T>>, ctxOrTimeFromNow: WithoutId<T>|number|undefined, timeFromNow = 0): void{
+        if(ctxOrTimeFromNow === undefined || typeof ctxOrTimeFromNow === "number"){
+            assertType<ProcGenPlain>(procGen);
+            this.#sim.spawn(procGen, ctxOrTimeFromNow as (number|undefined) ?? 0);
+        }
+        else {
+            assertType<ProcGenCtx<WithId<T>>>(procGen);
+            this.#sim.spawnCtx(procGen, ctxOrTimeFromNow as WithoutId<T>, timeFromNow);
+        }
     }
 
-    generate(vargen:VarGen, process:ProcessGenerator, delay = 0) {
-        return this.#sim.generate(vargen, delay, process);
+    generate(vargen:VarGen, procGen: ProcGenPlain): void;
+    generate<T extends object>(vargen:VarGen, procGen:ProcGenCtx<WithId<T>>, ctx: WithoutId<T>): void;
+    generate<T extends object>(vargen:VarGen, procGen:ProcessGenerator<WithId<T>>, ctx?: WithoutId<T>): void {
+        if(ctx === undefined){
+            assertType<ProcGenPlain>(procGen);
+            this.#sim.generate(vargen, procGen);
+        }
+        else{
+            assertType<ProcGenCtx<WithId<T>>>(procGen);
+            this.#sim.generateCtx(vargen, procGen, ctx as WithoutId<T>);
+        }
     }
 
     resource(name:string, capacity = 1, strict = true, priorities = 1): Resource {
@@ -86,14 +107,27 @@ class SimCore {
     resources: ResourceCore[] = [];
     #resourceMap = new Map<string, ResourceCore>();
 
-    spawn(procGen: ProcessGenerator, timeFromNow: number){
+    spawn(procGen: ProcGenPlain, timeFromNow: number){
         const id = ++this.#processId;
         const idProcess = Object.assign(procGen(id), {id});
         this.#schedule(timeFromNow, idProcess, Result.OK);
     }
 
-    generate(vargen:VarGen, delay:number, process:ProcessGenerator) {
-        const generator = generate(this, vargen, delay, process);
+    spawnCtx<T extends object>(procGen: ProcGenCtx<WithId<T>>, ctx: WithoutId<T>, timeFromNow: number){
+        const id = ++this.#processId;
+        const idProcess = Object.assign(procGen({...ctx, id} as WithId<T>), {id});
+        this.#schedule(timeFromNow, idProcess, Result.OK);
+    }
+
+    generate(vargen:VarGen, process:ProcGenPlain) {
+        const generator = generate(this, vargen, process);
+        const id = ++this.#processId;
+        const idProcess = Object.assign(generator, {id});
+        this.#schedule(0, idProcess, Result.OK);
+    }
+
+    generateCtx<T extends object>(vargen:VarGen, process:ProcGenCtx<WithId<T>>, ctx: WithoutId<T>) {
+        const generator = generateCtx(this, vargen, process, ctx);
         const id = ++this.#processId;
         const idProcess = Object.assign(generator, {id});
         this.#schedule(0, idProcess, Result.OK);
@@ -145,12 +179,12 @@ class SimCore {
                     const resource = this.resources[cmd.resource.index];
                     resource.release(process.id, cmd.capacity).forEach(nextProcess => this.#schedule(0, nextProcess, Result.OK));
                 }
-                else if(cmd.kind === "preempt") {
-                    if(process.impatience === undefined) throw "Only impatience processes can preempt";
+                else if(cmd.kind === "desist") {
+                    if(process.impatience === undefined) throw "Only impatience processes can desist";
                     const resource = this.resources[process.impatience!.resourceId];
-                    const preemptedProcess = resource.remove(process.impatience!.ticket);
-                    if(preemptedProcess !== undefined) {
-                        this.#schedule(0, preemptedProcess, Result.Preempted);
+                    const desistedProcess = resource.remove(process.impatience!.ticket);
+                    if(desistedProcess !== undefined) {
+                        this.#schedule(0, desistedProcess, Result.Desisted);
                     }
                 }
                 else if(cmd.kind === "interrupt") {
@@ -228,7 +262,7 @@ export class Resource {
         return {kind:"request", resource:this, capacity, priority, impatience: undefined}
     }
 
-    requestImpatient(impatience:ProcessGenerator, capacity:number = 1, priority:number = 1):Request {
+    requestImpatient(impatience:ProcGenPlain, capacity:number = 1, priority:number = 1): Request {
         return {kind:"request", resource:this, capacity, priority, impatience}
     }
 
@@ -395,11 +429,39 @@ export class Throttle {
     }
 }
 
-function* generate(sim: SimCore, vargen:VarGen, delay:number, process:ProcessGenerator): Process {
-    yield delay;
+function* generate(sim: SimCore, vargen:VarGen, process:ProcGenPlain): Process {
     for(const v of vargen){
         yield v;
         sim.spawn(process, 0);
+    }
+}
+
+function* generateCtx<T extends object>(sim:SimCore, vargen:VarGen, process:ProcGenCtx<WithId<T>>, ctx:WithoutId<T>): Process {
+    for(const v of vargen){
+        yield v;
+        sim.spawnCtx(process, ctx, 0);
+    }
+}
+
+export function* delay(time: number, vargen: VarGen): VarGen {
+    yield time;
+    yield *vargen;
+}
+
+export function* take(count: number, vargen: VarGen): VarGen {
+    for(const v of vargen){
+        if(count < 1) return;
+        yield v;
+        count -= 1;
+    }
+}
+
+export function* stopAt(startingAt: number, onlyUntil: number, vargen: VarGen): VarGen {
+    let t = startingAt;
+    for(const v of vargen){
+        t += v;
+        if(t > onlyUntil) return;
+        yield v;
     }
 }
 
@@ -407,8 +469,16 @@ export function* varExpo(lambda: number, random: () => number = Math.random) {
     while(true) yield -Math.log(1 - random()) / lambda;
 }
 
+export function expovariate(lambda: number, random: () => number = Math.random) {
+    return -Math.log(1 - random()) / lambda;
+}
+
 export function* varUniform(a: number, b: number, random: () => number = Math.random) {
     while(true) yield a + (b - a) * random();
+}
+
+export function uniform(a: number, b: number, random: () => number = Math.random) {
+    return a + (b - a) * random();
 }
 
 export function randomInt(mean:number, plusOrMinus:number, random: () => number = Math.random): number {

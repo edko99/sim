@@ -11,7 +11,7 @@ If she gets to the counter, she uses it for a while before releasing it.
 New customers are created by the source process every few time steps.
 */
 
-import { PREEMPT, Process, Result, Sim, expovariate, uniform } from "../../mod.ts";
+import { DESIST, Process, Result, Sim, expovariate, uniform } from "../../mod.ts";
 
 const NEW_CUSTOMERS = 5  // Total number of customers
 const INTERVAL_CUSTOMERS = 10.0  // Generate new customers roughly every x seconds
@@ -51,7 +51,7 @@ function* customer(): Process {
 function* impatience(): Process {
     const patience = uniform(MIN_PATIENCE, MAX_PATIENCE);
     yield patience;
-    yield PREEMPT;
+    yield DESIST;
 }
 
 sim.spawn(source);

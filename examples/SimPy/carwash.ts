@@ -13,7 +13,7 @@ Scenario:
   to finish. If not, they wait until they can use one.
 */
 
-import { Sim, Process, uniformInt } from "../../mod.ts";
+import { Sim, Process, uniformInt, varUniform } from "../../mod.ts";
 
 const NUM_MACHINES = 2  // Number of machines in the carwash
 const WASHTIME = 5      // Minutes it takes to clean a car
@@ -39,7 +39,7 @@ function* car(): Process {
 }
 
 for(let i=0; i<4; ++i) sim.spawn(car);
-sim.generate(car, T_INTER, 2);
+sim.generate(varUniform(T_INTER - 2, T_INTER + 2), car);
 
 console.log("Carwash");
 sim.run(SIM_TIME);

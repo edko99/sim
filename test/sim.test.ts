@@ -1,5 +1,5 @@
 import { assertEquals, fail, assert } from "https://deno.land/std@0.219.0/assert/mod.ts";
-import { Process, Sim, Result, PREEMPT, Throttle } from "../mod.ts";
+import { Process, Sim, Result, DESIST, Throttle } from "../mod.ts";
 
 Deno.test("One process is scheduled correctly", () => {
     const sim = new Sim();
@@ -62,13 +62,13 @@ Deno.test("Impatience", () => {
     }
     function* main(): Process {
         const result = yield resource.requestImpatient(impatience)
-        assertEquals(result, Result.Preempted);
+        assertEquals(result, Result.Desisted);
         assertEquals(sim.time, 10);
         ran = true;
     }
     function* impatience(): Process {
         yield 10;
-        yield PREEMPT;
+        yield DESIST;
     }
     sim.spawn(initialOccupant);
     sim.spawn(main);
@@ -124,12 +124,12 @@ Deno.test("Impatience causes non-strict resource queue to advance", () => {
     }
     function* second(): Process {
         const result = yield res.requestImpatient(impatience, 4);
-        assertEquals(result, Result.Preempted);
+        assertEquals(result, Result.Desisted);
         ++count;
     }
     function* impatience(): Process {
         yield 10;
-        yield PREEMPT;
+        yield DESIST;
         fail("Impatience process should have not reached here");
     }
     function* third(): Process {
@@ -191,10 +191,10 @@ Deno.test("Interrupt", () => {
     const sim = new Sim();
     let interruptorContinues = false;
     let wasInterrupted = false;
-    function* interrupted(id: number): Process {
+    function* interrupted(ctx:{id: number}): Process {
         function* interruptor(): Process {
             yield 10;
-            yield sim.interrupt(id);
+            yield sim.interrupt(ctx.id);
             assertEquals(sim.time, 10);
             interruptorContinues = true;
         }
@@ -203,8 +203,35 @@ Deno.test("Interrupt", () => {
         assertEquals(sim.time, 10);
         wasInterrupted = (result === Result.Interrupted);
     }
-    sim.spawn(interrupted);
+    sim.spawn(interrupted, {});
     sim.run();
     assert(wasInterrupted);
     assert(interruptorContinues);
+});
+
+Deno.test("Context is passed correctly to Sim.spawn", () => {
+    let checks = 0;
+    const sim = new Sim();
+    function* plain(){
+        yield 0;
+        assertEquals(sim.time, 42);
+        checks += 1;
+    }
+    function* plainWithId(id:number){
+        yield 0;
+        assertEquals(id, 4);
+        checks += 1;
+    }
+    function* withCtx(ctx:{id:number, foo:string}){
+        yield 0;
+        assert(ctx.id === 2 || ctx.id === 3);
+        assert(ctx.foo === "bar" && sim.time == 0 || ctx.foo === "baz" && sim.time == 420);
+        checks += 1;
+    }
+    sim.spawn(plain, 42);
+    sim.spawn(withCtx, {foo:"bar"});
+    sim.spawn(withCtx, {foo:"baz"}, 420);
+    sim.spawn(plainWithId, 42);
+    sim.run();
+    assertEquals(checks, 4);
 });
