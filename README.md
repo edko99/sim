@@ -3,7 +3,7 @@ Discrete event simulation library, inspired by GPSS and SimPy.
 
 ## Usage
 ```js
-import { Process, Sim, uniformInt, varExpo } from "https://deno.land/x/sim@v0.1.4/mod.ts";
+import { Process, Sim, uniformInt, varExpo } from "https://deno.land/x/sim@v0.1.5/mod.ts";
 
 const sim = new Sim();
 
