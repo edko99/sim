@@ -3,7 +3,7 @@ Discrete event simulation library, inspired by GPSS and SimPy.
 
 ## Usage
 ```js
-import { Process, Sim, uniformInt } from "https://deno.land/x/sim@v0.1.2-alpha/mod.ts";
+import { Process, Sim, uniformInt, varExpo } from "https://deno.land/x/sim@v0.1.4/mod.ts";
 
 const sim = new Sim();
 
@@ -15,7 +15,7 @@ function* agent(id: number): Process {
     console.log(`time ${sim.time}: agent ${id}, finished`);
 }
 
-sim.generatePoisson(agent, 1 / 5); // generate one agent every 5 units of time
+sim.generate(varExpo(1 / 5), agent); // generate one agent every 5 units of time
 sim.run(30); // start the simulation, and run it for 30 units of time
 ```
 
