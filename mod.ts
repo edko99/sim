@@ -27,6 +27,15 @@ export {
 } from "./src/sim.ts";
 
 export {
+    eCDF,
+    normalize,
+    accumulate,
+    asKeyVal,
+    queueLengthHistogram,
+    usageHistogram,
+} from "./src/logs.ts";
+
+export {
     queueLengthDistribution,
     queueLengthEvolution,
     consumptionDistribution,
